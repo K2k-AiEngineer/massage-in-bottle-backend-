@@ -34,7 +34,7 @@ const server = http.createServer(app);
 // Define allowed origins
 app.use(
   cors({
-    origin: "*",      
+    origin: "*",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -278,6 +278,125 @@ app.post("/api/users", async (req, res) => {
       .status(500)
       .json(`{ message: Error registering user: ${error.message} }`);
   }
+});
+
+
+app.post('/premium-One', async(req,res) =>{
+  const{ email, token} = req.body;
+
+  try{
+    const user = await User.findOne({email});
+    if(!user) return res.status(404).json({message: "user not found"});
+
+    const charge = await stripe.charges.create({
+      amount: 999, 
+      currrency:" usd",
+      source: token,
+      description: "Premium Membership",
+    });
+    // console.log("logic skipped");
+
+    user.isPremium = true;
+    await user.save();
+
+    res.status(200).json({message: "payment successful! premium awaited"});
+  } catch(error){
+    res.status(500).json({message: `payment failed: ${error.message}`});
+
+  }
+
+});
+
+const premiumOne = async(req,res,next) =>{
+  const {email} = req.body;
+  const user = await User.findOne({email});
+
+  if(!user || !user.isPremium) {
+    return res.status(403).json({message: "access denied, premium required!!"});
+  }
+
+  next();
+};
+
+
+app.post('/premiumThree', async(req,res) =>{
+  const{ email, token} = req.body;
+
+  try{
+    const user = await User.findOne({email});
+    if(!user) return res.status(404).json({message: "user not found"});
+
+    const charge = await stripe.charges.create({
+      amount: 2697, 
+      currrency: usd,
+      source: token,
+      description: "Premium Membership",
+    });
+
+    user.isPremium = true;
+    await user.save();
+
+    res.status(200).json({message: "payment successful! premium awaited"});
+  } catch(error){
+    res.status(500).json({message: `payment failed: ${error.message}`});
+
+  }
+
+});
+
+const premiumThree = async(req,res,next) =>{
+  const {email} = req.body;
+  const user = await User.findOne({email});
+
+  if(!user || !user.isPremium) {
+    return res.status(403).json({message: "access denied, premium required!!"});
+  }
+
+  next();
+};
+
+app.get('/premium-Three', premiumThree, (req, res) =>{
+  res.status(200).json({message: 'Welcome to premium feature'});
+});
+
+app.post('/premium-year', async(req,res) =>{
+  const{ email, token} = req.body;
+
+  try{
+    const user = await User.findOne({email});
+    if(!user) return res.status(404).json({message: "user not found"});
+
+    const charge = await stripe.charges.create({
+      amount: 9590, 
+      currrency: usd,
+      source: token,
+      description: "Premium Membership",
+    });
+
+    user.isPremium = true;
+    await user.save();
+
+    res.status(200).json({message: "payment successful! premium awaited"});
+  } catch(error){
+    res.status(500).json({message: `payment failed: ${error.message}`});
+
+  }
+
+});
+
+const premiumYear = async(req,res,next) =>{
+  const {email} = req.body;
+  const user = await User.findOne({email});
+
+  if(!user || !user.isPremium) {
+    return res.status(403).json({message: "access denied, premium required!!"});
+  }
+
+  next();
+};
+
+app.get('/premium-year', premiumYear, (req, res) =>{
+  res.status(200).json({message: 'Welcome to premium feature'});
 });
 
 app.post("/api/auth/login", async (req, res) => {
