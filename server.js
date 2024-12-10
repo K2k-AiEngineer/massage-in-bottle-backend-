@@ -18,6 +18,8 @@ const audioSignal = require("./services/audioSignal");
 const videoSignal = require("./services/videoSIgnal");
 const connectDB = require("./db.js");
 // const callRoutes = require("./routes/call");
+const aws = require('aws-sdk');
+const multerS3 = require('multer-s3');
 
 const app = express();
 const server = http.createServer(app);
@@ -56,15 +58,71 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // app.use("/api/call", callRoutes);
 
-const storage = multer.diskStorage({
+
+aws.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID, 
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY, 
+  region: process.env.AWS_REGION || 'eu-west-1',
+});
+
+const storage = process.env.USE_S3 === 'true' ? multerS3({
+  s3: s3,
+  bucket: process.env.AWS_BUCKET_NAME,
+  metadata: (req, file, cb) => {
+    cb(null, { fieldName: file.fieldname });
+  },
+  key: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+}) : multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/");
+    cb(null, 'uploads/'); 
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + "-" + file.originalname);
-  },
+  }
 });
+
+// Initialize multer with the selected storage
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+
+    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
+      cb(null, true); 
+    } else {
+      cb(new Error('Unsupported file type'), false); 
+    }
+  }
+});
+
+
+// const s3 = new aws.S3();
+// const upload = multer({
+//   storage: multerS3({
+//     s3: s3,
+//     bucket: process.env.AWS_BUCKET_NAME,
+//     metadata:(req, file,cb) =>{
+//       cb(null, {fieldName: file.fieldname});
+//     },
+//     key:(req, file,cb) =>{
+//       const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+//       cb(null, uniqueSuffix + "-" + file.originalname);
+//     },
+//   }),
+// });
+
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     cb(null, "uploads/");
+//   },
+//   filename: (req, file, cb) => {
+//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+//     cb(null, uniqueSuffix + "-" + file.originalname);
+//   },
+// });
 
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith("image/")) {
@@ -73,7 +131,7 @@ const fileFilter = (req, file, cb) => {
     cb(new Error("Only image files are allowed!"), false);
   }
 };
-const upload = multer({ storage });
+// const upload = multer({ storage });
 
 const profileUpload = multer({ storage, fileFilter });
 
@@ -208,9 +266,7 @@ app.post("/api/users", async (req, res) => {
 
     await newUser.save();
 
-    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
-      expiresIn: "4h",
-    });
+    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, );
 
     res.status(201).json({
       message: "User registered successfully",
@@ -238,9 +294,7 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "4h",
-    });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, );
 
     res.json({ token, user: { id: user._id, email: user.email } });
   } catch (error) {
@@ -309,6 +363,81 @@ app.post("/reset-password", async (req, res) => {
     res.status(500).send(`Error resetting password: ${error.message}`);
   }
 });
+module.exports = (io, userSocketMap) => {
+  io.on("connection", (socket) => {
+    console.log("New client connected:", socket.id);
+
+    // Register user and map to socket ID
+    socket.on("registerUser", (userId) => {
+      userSocketMap.set(userId, socket.id);
+      console.log(`User ${userId} registered with socket ${socket.id}`);
+    });
+
+    // Initiate a call
+    socket.on("callUser", ({ userToCall, from, signalData }) => {
+      const recipientSocket = userSocketMap.get(userToCall);
+      if (recipientSocket) {
+        console.log(`Initiating call from ${from} to ${userToCall}`);
+        io.to(recipientSocket).emit("callUser", { from, signal: signalData });
+      } else {
+        console.log(`User ${userToCall} is not available.`);
+      }
+    });
+
+    // Answer a call
+    socket.on("answerCall", ({ to, signal }) => {
+      const callerSocket = userSocketMap.get(to);
+      if (callerSocket) {
+        console.log(`Answering call to ${to}`);
+        io.to(callerSocket).emit("callAccepted", signal);
+      } else {
+        console.log(`Caller ${to} is not connected.`);
+      }
+    });
+
+    // Handle ICE Candidates
+    socket.on("iceCandidate", ({ to, candidate }) => {
+      const recipientSocket = userSocketMap.get(to);
+      if (recipientSocket) {
+        console.log(`Sending ICE candidate to ${to}`);
+        io.to(recipientSocket).emit("iceCandidate", { candidate });
+      } else {
+        console.log(`Recipient ${to} is not available for ICE candidates.`);
+      }
+    });
+
+    // Handle call rejection
+    socket.on("rejectCall", ({ to }) => {
+      const recipientSocket = userSocketMap.get(to);
+      if (recipientSocket) {
+        console.log(`Call rejected by ${socket.id}`);
+        io.to(recipientSocket).emit("callRejected");
+      }
+    });
+
+    // End a call
+    socket.on("endCall", ({ to }) => {
+      const recipientSocket = userSocketMap.get(to);
+      if (recipientSocket) {
+        console.log(`Ending call with ${to}`);
+        io.to(recipientSocket).emit("callEnded");
+      }
+    });
+
+    // Handle user disconnect
+    socket.on("disconnect", () => {
+      console.log("Client disconnected:", socket.id);
+      for (const [userId, id] of userSocketMap.entries()) {
+        if (id === socket.id) {
+          userSocketMap.delete(userId);
+          console.log(`User ${userId} disconnected and removed from map.`);
+          break;
+        }
+      }
+    });
+  });
+};
+
 
 app.get("/users", async (req, res) => {
   try {

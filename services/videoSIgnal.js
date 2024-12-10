@@ -31,8 +31,20 @@ module.exports = (io, userSocketMap) => {
       const socketId = userSocketMap.get(to);
       if (socketId) {
         console.log(`Signal and to: ${signal}, Socket ID: ${socketId}`);
-        io.to(socketId).emit("callAccepted", signal);
-        console.log("call accepted");
+        io.to(socketId).emit("answerCall", signal); // Ensure consistency in event names
+        console.log("Answer signal sent to caller");
+      }
+    });
+
+    socket.on("iceCandidate", async ({ candidate }) => {
+      try {
+        console.log("ICE Candidate received:", candidate);
+        if (peerConnection.current && candidate) {
+          await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+          console.log("ICE Candidate added successfully");
+        }
+      } catch (error) {
+        console.error("Error adding ICE candidate:", error);
       }
     });
 

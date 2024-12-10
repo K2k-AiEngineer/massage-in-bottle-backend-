@@ -135,6 +135,8 @@ router.post("/send-message", async (req, res) => {
   }
 });
 
+
+
 // Get chat history between two users
 router.get("/history/:userId/:contactId", async (req, res) => {
   const { userId, contactId } = req.params;
