@@ -10,7 +10,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.705.0",
     "@aws-sdk/lib-storage": "^3.705.0",
@@ -38,5 +37,7 @@
     "stripe": "^17.4.0",
     "uuid": "^10.0.0",
     "ws": "^8.18.0"
-  }
+  },
+  "devDependencies": {},
+  "description": ""
 }
