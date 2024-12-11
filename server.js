@@ -20,6 +20,7 @@ const connectDB = require("./db.js");
 // const callRoutes = require("./routes/call");
 const aws = require('aws-sdk');
 const multerS3 = require('multer-s3');
+const { default: Stripe } = require("stripe");
 
 const app = express();
 const stripe = Stripe("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");
