@@ -23,7 +23,7 @@ const multerS3 = require('multer-s3');
 const { default: Stripe } = require("stripe");
 
 const app = express();
-const stripe = Stripe("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");
+const stripe = Stripe(process.env.STRIPE_KEY);
 const server = http.createServer(app);
 
 // app.use(
