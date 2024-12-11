@@ -22,6 +22,7 @@ const aws = require('aws-sdk');
 const multerS3 = require('multer-s3');
 
 const app = express();
+const stripe = Stripe("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");
 const server = http.createServer(app);
 
 // app.use(
