@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     blockedUsers: { type: Boolean, default: false },
     avatar: { type: String, default: null },
-    isPremium:{ type: Boolean, default: false}
+    isPremium:{ type: Boolean, default: true}
   },
   { timestamps: true }
 );
